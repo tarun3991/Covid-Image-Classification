@@ -47,15 +47,13 @@ from sklearn.metrics import roc_auc_score
 from sklearn.metrics import accuracy_score, f1_score, recall_score, precision_score
 from keras.callbacks import ModelCheckpoint, EarlyStopping, CSVLogger, ReduceLROnPlateau, TensorBoard
 
-
 #Specifying learning rate, epochs and batch size
-lr = 0.00001   
-epochs = 500
+lr = 0.0001   
+epochs = 200
 BS = 32
 
-
 #Dataset loading and preprocessing it
-CATEGORIES = ["covid", "non-covid"]
+CATEGORIES = ["covid", "normal", "pneumonia"]
 
 def get_dataset(directory):
   data = []
@@ -70,23 +68,19 @@ def get_dataset(directory):
           
           data.append(im)
           labels.append(category)
-
+      
   lb = LabelBinarizer()
   labels = lb.fit_transform(labels)
-  labels = to_categorical(labels) 
-  n_classes = len(lb.classes_)
 
   data = np.array(data, dtype="float32") 
   labels = np.array(labels)
-
   return data, labels
-
-
+  
 #Training and Testing data  
-directory = '/home/container/tarun/final_dl_work/images/train/'
-x_train, y_train = get_dataset(directory)
-x_test, y_test = get_dataset('/home/container/tarun/final_dl_work/images/test/')
-
+directory = 'path to the train directory'
+x_train, y_train  = get_dataset(directory)
+#print(x_train.shape, y_train.shape)
+x_test, y_test = get_dataset('path to the test directory')
 
 #Data Augmentation
 aug = ImageDataGenerator(
@@ -95,7 +89,6 @@ aug = ImageDataGenerator(
     zoom_range=0.2,horizontal_flip=True, 
     fill_mode="nearest")
 
-
 #Five fold cross validation and model compiling and training
 n_folds = 5
 acc_per_fold = []
@@ -103,7 +96,6 @@ loss_per_fold = []
 fold_no = 1
 
 kf = KFold(n_splits=n_folds, shuffle=True, random_state=0)
-
 for i, (tr_idx, val_idx) in enumerate(kf.split(x_train,y_train)):
     #print(len(tr_idx), len(val_idx))
     x_tr, y_tr = x_train[tr_idx], y_train[tr_idx]
@@ -116,7 +108,7 @@ for i, (tr_idx, val_idx) in enumerate(kf.split(x_train,y_train)):
     headmodel = Dropout(0.5)(headmodel)
     headmodel = Dense(64, activation="relu")(headmodel)
     headmodel = Dropout(0.5)(headmodel)
-    headmodel = Dense((2), activation="softmax")(headmodel)
+    headmodel = Dense(3, activation="softmax")(headmodel)
 
     model = Model(inputs=basemodel.input, outputs=headmodel)
     
@@ -126,7 +118,7 @@ for i, (tr_idx, val_idx) in enumerate(kf.split(x_train,y_train)):
     opt = Adam(learning_rate=lr, decay=lr/epochs)
     model.compile(optimizer = opt, loss='binary_crossentropy', metrics=["accuracy"])
     
-    mc_path = '/home/container/tarun/final_dl_work/VGG16Model/vgg16-models/model'+str(fold_no)+'.h5'
+    mc_path = 'path to the folder/vgg16-models/model'+str(fold_no)+'.h5'
 
     model_checkpoint = ModelCheckpoint(filepath=mc_path, 
                                        monitor='val_loss', 
@@ -134,10 +126,10 @@ for i, (tr_idx, val_idx) in enumerate(kf.split(x_train,y_train)):
                                        save_best_only=True, 
                                        verbose=1)
     early_stop = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=10, restore_best_weights=True)
-    csv_logger = CSVLogger('/home/container/tarun/final_dl_work/VGG16Model/train_log/training_log'+str(fold_no)+".csv", separator = ",", append=True)
-    tensor_board = TensorBoard(log_dir = '/home/container/tarun/final_dl_work/VGG16Model/tensorboard_logs/log'+str(fold_no), 
+    csv_logger = CSVLogger('path to the folder/train_log/training_log'+str(fold_no)+".csv", separator = ",", append=True)
+    tensor_board = TensorBoard(log_dir = 'path to the folder/tensorboard_logs/log'+str(fold_no), 
                                            histogram_freq = 1, write_graph = True, write_images = True)
-    reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=10, verbose=1)
+    reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=5, verbose=1)
 
     callback_list = [model_checkpoint, early_stop, csv_logger, tensor_board, reduce_lr]
     
@@ -159,7 +151,6 @@ for i, (tr_idx, val_idx) in enumerate(kf.split(x_train,y_train)):
     
     fold_no = fold_no + 1
 
-
 #Printing average scores for cross validation
 print('------------------------------------------------------------------------')
 print('Score per fold')
@@ -172,72 +163,53 @@ print(f'> Accuracy: {np.mean(acc_per_fold)} (+- {np.std(acc_per_fold)})')
 print(f'> Loss: {np.mean(loss_per_fold)}')
 print('------------------------------------------------------------------------')
 
-
 #Model Prediction 
-path = '/home/container/tarun/final_dl_work/VGG16Model/vgg16-models/'
+path = 'load saved models from the path'
 prediction = list()
 for model in os.listdir(path):
-    #print(model)
     new_model = load_model(path+model)
     pred = new_model.predict(x_test)
     prediction.append(pred)
 
-
 #Prediction for each model
-cv_pred = [np.array(pred[:,1] > 0.5, dtype=np.int) for pred in prediction]
-#cv_pred
-
+cv_pred = np.array([pred for pred in prediction])
 
 #Average Prediction for cross validation
-cv_pred_avg = np.array(np.mean(prediction, axis=0)[:,1] > 0.5).astype(np.int)
-#cv_pred_avg
+cv_pred_avg = np.mean(cv_pred, axis=0)
+print("cv_pred_avg:", cv_pred_avg.shape)
 
+predicted_class = np.argmax(cv_pred_avg, axis=1)
+print("predicted_class:", predicted_class)
 
 #Score Metrics
-accuracy_score = accuracy_score(y_test.argmax(axis=1), cv_pred_avg)
-print('Accuracy : ', accuracy_score)
+y_test_class = np.argmax(y_test,axis=1)
+print("y_test_class:", y_test_class)
+print(y_test_class.shape, predicted_class.shape)
 
-f1_score = f1_score(y_test.argmax(axis=1), cv_pred_avg)
-print('F1-score : ', f1_score)
+#Classification report is saved in csv file format
+report = metrics.classification_report(y_test_class, predicted_class, output_dict=True)
+df = pd.DataFrame(report).transpose()
+df.to_csv('vgg16_classification_report.csv', index = True)
 
-precision_score = precision_score(y_test.argmax(axis=1), cv_pred_avg)
-print('Precision score : ', precision_score)
-
-recall_score = recall_score(y_test.argmax(axis=1), cv_pred_avg)
-print('Recall score : ', recall_score)
-
-
-#Plotting ROC Curve
-fpr, tpr, threshold = roc_curve(y_test.argmax(axis=1), cv_pred_avg)
+#Receiver Characteristic Operating Curve values savd in csv file
+fpr, tpr, threshold = roc_curve(y_test_class, cv_pred_avg[:,1], drop_intermediate=False)
 roc_auc = metrics.auc(fpr, tpr)
-plt.title('Receiver Operating Characteristic')
-plt.plot(fpr, tpr, 'b', label = 'AUC = %0.3f' % roc_auc)
-plt.legend(loc='lower right')
-plt.plot([0, 1], [0, 1],'r--')
-plt.xlim([0, 1])
-plt.ylim([0, 1])
-plt.ylabel('True Positive Rate')
-plt.xlabel('False Positive Rate')
-plt.savefig("/home/container/tarun/final_dl_work/VGG16Model/plots/ROC_VGG16.png",dpi=600,format='png')
-plt.clf()
+roc_df = pd.DataFrame({'False Positive Rate': fpr, 'True Positive Rate': tpr, 'Thresholds': threshold})
+roc_df.to_csv('vgg16_roc_curve.csv', index=True)
 
+#Confusion matrix csv file
+cm = metrics.confusion_matrix(y_test_class, predicted_class)
+conf_mat = pd.DataFrame(cm)
+conf_mat.to_csv('vgg16_conf_matrix.csv')
 
-#Plotting Confusion Matrix
-cm = confusion_matrix(y_test.argmax(axis=1), cv_pred_avg)
-axes = sns.heatmap(cm, annot=True, cbar=True, cmap=plt.cm.Blues, fmt='d')
-axes.set_xlabel('Predicted')
-axes.set_ylabel('Actual')
-axes.set_title("confusion matrix")
-axes.set_xticklabels(CATEGORIES)
-axes.set_yticklabels(CATEGORIES)
-plt.savefig("/home/container/tarun/final_dl_work/VGG16Model/plots/CM_VGG16.png",dpi=600,format='png')
-plt.clf()
+accuracy = accuracy_score(y_test_class, predicted_class)
+print('Accuracy : ', accuracy)
 
+precision = precision_score(y_test_class, predicted_class)
+print('Precision score : ', precision)
 
-#Sensitivity and Specificity of the model
-total1=sum(sum(cm))
-sensitivity1 = cm[0,0]/(cm[0,0]+cm[0,1])
-print('Sensitivity : ', sensitivity1 )
+recall = recall_score(y_test_class, predicted_class)
+print('Recall score : ', recall)
 
-specificity1 = cm[1,1]/(cm[1,0]+cm[1,1])
-print('Specificity : ', specificity1)
+f1 = f1_score(y_test_class, predicted_class)
+print('F1-score : ', f1)
