@@ -15,7 +15,7 @@ conda env create -f env.yml
 ```
 Note 1: Conda version used is 23.7.4.
 
-Note 2: You can remane the enviornment name according to your choice by editing the name and prefix in yml file.
+Note 2: You can remane the environment name accordingly by editing the name and prefix in yml file.
 
 
 ### Step 2: Activate the conda environment
@@ -29,11 +29,11 @@ Here, we have given the test dataset while you can train the model with large da
 ```
 python name_of_the_script.py
 ```
-Note 3: This code is developed for gpu. If you want to test the codes on cpu, you can edit the script.py file by removing the lines 5-8.  
+Note 3: This code is developed for gpu. If you want to test the codes on cpu, edit the model.py file by removing the lines 5-8.  
 
 Note 4: Modify the hyperparameters accordingly.
 
-Note 5: Create directories **vgg16_models** for storing the saved models, **train_log** and tensorboard_logs for storing the csvlogger and tensorboard data.
+Note 5: Create directories **vgg16_models** for storing the saved models, **train_log** and **tensorboard_logs** for storing the csvlogger and tensorboard data.
 
 Note 6: You can write individual scipts for generating the plots (ROC Curve and Confusion matrix).
  
