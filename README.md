@@ -4,7 +4,7 @@ This study has been performed to develop the image classification pipeline for a
 
 clone the github repository
 ```
-git clone https://github.com/Lynn-Group-JNU/COVID_Image_Classification.git
+git clone https://github.com/tarun3991/Covid-Image-Classification.git
 ```
 
 ## Steps to follow for machine setup and running the model
